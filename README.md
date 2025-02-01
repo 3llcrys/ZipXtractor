@@ -52,6 +52,6 @@ python .\ZipXtractor.py --action extract --file .\MUC-System1-2025-01-31.zip --p
 Extract specific directory 'Logs' of ZipFile in a output directory named as a regular expression match of the input ZipFile
 ```bash
 python .\ZipXtractor.py --action extract --file .\MUC-System1-2025-01-31.zip --path 'Logs\' --output '.\out\$match' --structure 'False' --regex 'MUC-([A-Za-z0-9\-]+)-[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}'
-\#Regex MUC-([A-Za-z0-9\-]+)-[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} identified "System1"
-\#Files will be extracted to '.\out\System1'
+#Regex MUC-([A-Za-z0-9\-]+)-[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} identified "System1"
+#Files will be extracted to '.\out\System1'
 ```
