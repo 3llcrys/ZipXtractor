@@ -16,11 +16,11 @@ def parse_arguments():
 #check if multiple zipfiles should be extracted  
 def get_zip_file_list(args):
     zipFileList = []
-    if args.file == ".":
+    if args.file.endswith("."):
         dirFiles = os.listdir(args.file)
         for file in dirFiles:
             if file.endswith('.zip'):
-                zipFileList.append(".\\"+os.path.join(file))
+                zipFileList.append((args.file).replace("\\.", "")+"\\"+os.path.join(file))
     else:
         zipFileList.append(os.path.join(args.file))
     return zipFileList
@@ -41,71 +41,77 @@ def list_contents(args, zipFileList):
 # Extract Files
 def extract_files(args, zipFileList):
     if (args.action).lower() == "extract":
-        if args.output == None:
+        if args.output is None:
             print("Please ensure that the argument '--output' is set for extraction")
+            return
         for zipFile in zipFileList:
-            # Replace outputpath with regex
+            # Replace output path with regex
             if "$match" in args.output:
                 match = re.search(args.regex, zipFile)
-                output = (args.output).replace("$match", match.group(1))
-                print(f'Regex {args.regex} identified "{match.group(1)}"')
+                if match:
+                    output = args.output.replace("$match", match.group(1))
+                    print(f'Regex {args.regex} identified "{match.group(1)}"')
+                else:
+                    print(f"No match found in filename '{zipFile}' using regex '{args.regex}'")
+                    continue
             else:
                 output = args.output
             print(f"Files will be extracted to '{output}'")
+
             with zipfile.ZipFile(zipFile, 'r') as archiveFile:
-                # If no Path is set extract entire archvie
-                if (args.path is None):
-                    with archiveFile as source_file:
-                        source_file.extractall(output)
-                        exit()
-                # if specific path is given as argument extract only item within this path
-                if args.path in archiveFile.namelist():
-                    with archiveFile.open(args.path) as source_file:
-                        # if it is a directory
-                        if (args.path).endswith('/'):
-                            outputDir = os.path.join((output +'\\'), os.path.basename(os.path.normpath(args.path)))
-                            if (args.structure).lower() == "false":
-                                os.makedirs(outputDir)
-                            # Loop for files of directory if directory
-                                for file in archiveFile.namelist():
-                                    if file.startswith(args.path):
-                                        if not ((file).endswith('/')):
-                                            with archiveFile.open(file) as source_file:
-                                                outputFile= os.path.join((outputDir +'\\'), os.path.basename(os.path.normpath(file)))
-                                                with open(outputFile, 'wb') as dest_file:
-                                                    dest_file.write(source_file.read())
-                            # Keep file structure
-                            if (args.structure).lower() == "true":
-                                for file in archiveFile.namelist():
-                                    if file.startswith(args.path):
-                                        archiveFile.extract(file, output)
-                        # if it is only a file
+                # If no Path is set, extract the entire archive
+                if args.path is None:
+                    archiveFile.extractall(output)
+                    continue
+
+                # Determine if the path is a directory
+                path_is_directory = args.path.endswith('/')
+
+                # Extract files based on the specified path
+                found = False
+                for file in archiveFile.namelist():
+                    if file.startswith(args.path):
+                        found = True
+                        # Determine the relative path based on whether the directory itself should be included
+                        if path_is_directory:
+                            #ignore directory
+                            relative_path = file[len(args.path):]
+                            destination = os.path.join(output, relative_path)
                         else:
-                            if (args.structure).lower() == "false":
-                                for file in archiveFile.namelist():
-                                    if file.startswith(args.path):
-                                        outputDir = os.path.join(output)
-                                        # create output dir if not existend
-                                        if not os.path.exists(outputDir):
-                                            os.makedirs(outputDir)
-                                        outputFile = os.path.join(output, os.path.basename(args.path))
-                                        with archiveFile.open(file) as source_file:
-                                            with open(outputFile, 'wb') as dest_file:
-                                                dest_file.write(source_file.read())
-                            # Keep file structure
-                            if (args.structure).lower() == "true":
-                                for file in archiveFile.namelist():
-                                    if file.startswith(args.path):
-                                        archiveFile.extract(file, output)
-                else:
-                    print(f"Can not find specified path in ZipFile: {args.path}, for directory end with '\' to extract contents.")
- 
+                            #include directory
+                            relative_path = file[len(os.path.dirname(args.path)):]
+                            destination = os.path.join(output, relative_path)
+
+                        # Keep original structure
+                        if args.structure.lower() == "true":
+                            archiveFile.extract(file, output)
+                        else:
+                            # extract files without structure
+                            if not file.endswith('/'):
+                                if path_is_directory:
+                                    # Dont include directory
+                                    destination = os.path.join(output, os.path.basename(file))
+                                else:
+                                    #include the directory
+                                    destination = os.path.join(output, os.path.relpath(file, os.path.dirname(args.path)))
+                                
+                                # Write / Extract files
+                                os.makedirs(os.path.dirname(destination), exist_ok=True)
+                                with archiveFile.open(file) as source_file:
+                                    with open(destination, 'wb') as dest_file:
+                                        dest_file.write(source_file.read())
+
+                if not found:
+                    print(f"Cannot find specified path in ZipFile: {args.path}. Available paths:")
+                    for name in archiveFile.namelist():
+                        print(name)
  
 def main():
     args = parse_arguments()
     if args.path != None:
         args.path = (args.path).replace("\\", "/")
     zip_file_list = get_zip_file_list(args)
+    print(zip_file_list)
  
     if args.action.lower() == "list":
         list_contents(args, zip_file_list)
